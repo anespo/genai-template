@@ -1,0 +1,120 @@
+name: CI
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: [3.11, 3.12]
+
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Set up Python ${{ matrix.python-version }}
+      uses: actions/setup-python@v4
+      with:
+        python-version: ${{ matrix.python-version }}
+    
+    - name: Install cookiecutter
+      run: |
+        python -m pip install --upgrade pip
+        pip install cookiecutter
+    
+    - name: Generate project from template
+      run: |
+        cookiecutter . --no-input
+    
+    - name: Install dependencies
+      run: |
+        cd genai_multi_provider_template
+        python -m pip install --upgrade pip
+        pip install -e .
+        pip install pytest pytest-cov pytest-asyncio pytest-mock
+    
+    - name: Run tests
+      run: |
+        cd genai_multi_provider_template
+        pytest tests/ -v --cov=genai_multi_provider_template --cov-report=xml
+    
+    - name: Upload coverage to Codecov
+      uses: codecov/codecov-action@v3
+      with:
+        file: ./genai_multi_provider_template/coverage.xml
+        flags: unittests
+        name: codecov-umbrella
+
+  lint:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: 3.11
+    
+    - name: Install cookiecutter and linting tools
+      run: |
+        python -m pip install --upgrade pip
+        pip install cookiecutter black isort flake8 mypy
+    
+    - name: Generate project from template
+      run: |
+        cookiecutter . --no-input
+    
+    - name: Install project dependencies
+      run: |
+        cd genai_multi_provider_template
+        pip install -e .
+    
+    - name: Run black
+      run: |
+        cd genai_multi_provider_template
+        black --check genai_multi_provider_template/
+    
+    - name: Run isort
+      run: |
+        cd genai_multi_provider_template
+        isort --check-only genai_multi_provider_template/
+    
+    - name: Run flake8
+      run: |
+        cd genai_multi_provider_template
+        flake8 genai_multi_provider_template/
+    
+    - name: Run mypy
+      run: |
+        cd genai_multi_provider_template
+        mypy genai_multi_provider_template/ --ignore-missing-imports
+
+  docker:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Install cookiecutter
+      run: |
+        python -m pip install --upgrade pip
+        pip install cookiecutter
+    
+    - name: Generate project from template
+      run: |
+        cookiecutter . --no-input
+    
+    - name: Build Docker image
+      run: |
+        cd genai_multi_provider_template
+        docker build -t genai-template-test .
+    
+    - name: Test Docker image
+      run: |
+        cd genai_multi_provider_template
+        docker run --rm genai-template-test python -c "import genai_multi_provider_template; print('Docker build successful')"
